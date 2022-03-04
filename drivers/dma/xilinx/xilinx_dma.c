@@ -1816,8 +1816,12 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
 	/* Read the status and ack the interrupts. */
 	status = dma_ctrl_read(chan, XILINX_DMA_REG_DMASR);
 	if (!(status & XILINX_DMA_DMAXR_ALL_IRQ_MASK))
+	{
+		tasklet_schedule(&chan->tasklet);
 		return IRQ_NONE;
+	}
 
+	/* Clear three IRQ Flag bits */
 	dma_ctrl_write(chan, XILINX_DMA_REG_DMASR,
 			status & XILINX_DMA_DMAXR_ALL_IRQ_MASK);
 
@@ -1853,12 +1857,17 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
 		dev_dbg(chan->dev, "Inter-packet latency too long\n");
 	}
 
-	if (status & XILINX_DMA_DMASR_FRM_CNT_IRQ) {
-		spin_lock(&chan->lock);
-		xilinx_dma_complete_descriptor(chan);
-		chan->idle = true;
-		chan->start_transfer(chan);
-		spin_unlock(&chan->lock);
+	/* if not in cyclic mode, start transfer */
+	// if (!(chan->cyclic))
+	if (1)
+	{
+		if (status & XILINX_DMA_DMASR_FRM_CNT_IRQ) {
+			spin_lock(&chan->lock);
+			xilinx_dma_complete_descriptor(chan);
+			chan->idle = true;
+			chan->start_transfer(chan);
+			spin_unlock(&chan->lock);
+		}
 	}
 
 	tasklet_schedule(&chan->tasklet);
@@ -2856,12 +2865,15 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
 		chan->stop_transfer = xilinx_dma_stop_transfer;
 	}
 
+	dev_info(xdev->dev, "ddomax xilinx_dma.c Verison: 2022 03 04 21:45, enable start_transfer in cyclic mode\n");
+	dev_info(xdev->dev, "ddomax: reading the sg status register\n");
 	/* check if SG is enabled (only for AXIDMA, AXIMCDMA, and CDMA) */
 	if (xdev->dma_config->dmatype != XDMA_TYPE_VDMA) {
 		if (xdev->dma_config->dmatype == XDMA_TYPE_AXIMCDMA ||
 		    dma_ctrl_read(chan, XILINX_DMA_REG_DMASR) &
 			    XILINX_DMA_DMASR_SG_MASK)
 			chan->has_sg = true;
+			dev_info(xdev->dev, "ddomax: status register : %x\n", dma_ctrl_read(chan, XILINX_DMA_REG_DMASR));
 		dev_dbg(chan->dev, "ch %d: SG %s\n", chan->id,
 			chan->has_sg ? "enabled" : "disabled");
 	}
