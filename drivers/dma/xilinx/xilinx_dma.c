@@ -1817,7 +1817,7 @@ static irqreturn_t xilinx_dma_irq_handler(int irq, void *data)
 	status = dma_ctrl_read(chan, XILINX_DMA_REG_DMASR);
 	if (!(status & XILINX_DMA_DMAXR_ALL_IRQ_MASK))
 	{
-		tasklet_schedule(&chan->tasklet);
+		// tasklet_schedule(&chan->tasklet);
 		return IRQ_NONE;
 	}
 
@@ -2311,9 +2311,12 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
 	segment->hw.next_desc = (u32) head_segment->phys;
 
 	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
+	/* only 2 segments whose period_len is smaller than hardware limit can use the following setup */
 	if (direction == DMA_MEM_TO_DEV) {
 		head_segment->hw.control |= XILINX_DMA_BD_SOP;
+		head_segment->hw.control |= XILINX_DMA_BD_EOP; //add by ddomax : make tlast and IOC available after transferring a segment
 		segment->hw.control |= XILINX_DMA_BD_EOP;
+		segment->hw.control |= XILINX_DMA_BD_SOP; //add by ddomax : make tlast and IOC available after transferring a segment
 	}
 
 	return &desc->async_tx;
@@ -2865,7 +2868,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
 		chan->stop_transfer = xilinx_dma_stop_transfer;
 	}
 
-	dev_info(xdev->dev, "ddomax xilinx_dma.c Verison: 2022 03 04 21:45, enable start_transfer in cyclic mode\n");
+	dev_info(xdev->dev, "ddomax xilinx_dma.c Verison: 2022 03 07 02:42, enable start_transfer in cyclic mode\n");
 	dev_info(xdev->dev, "ddomax: reading the sg status register\n");
 	/* check if SG is enabled (only for AXIDMA, AXIMCDMA, and CDMA) */
 	if (xdev->dma_config->dmatype != XDMA_TYPE_VDMA) {
