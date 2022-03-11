@@ -1723,12 +1723,21 @@ static int xilinx_dma_chan_reset(struct xilinx_dma_chan *chan)
 
 	/* Reset VDMA */
 	err = xilinx_dma_reset(chan);
+	dev_info(chan->dev, "ddomax: DMA Channel CR Register is written to perform a soft reset (1)\n");
 	if (err)
 		return err;
+
+	dev_info(chan->dev, "ddomax: DMA Channel CR Register is written to perform a soft reset (2)\n");
 
 	/* Enable interrupts */
 	dma_ctrl_set(chan, XILINX_DMA_REG_DMACR,
 		      XILINX_DMA_DMAXR_ALL_IRQ_MASK);
+
+	dev_info(chan->dev, "ddomax: after enable all IRQ: cr %x, sr %x\n",
+		dma_ctrl_read(chan, XILINX_DMA_REG_DMACR),
+		dma_ctrl_read(chan, XILINX_DMA_REG_DMASR));
+
+	dev_info(chan->dev, "ddomax: DMA Channel CR Register is written to enable all IRQ (done)\n");
 
 	return 0;
 }
@@ -2461,6 +2470,16 @@ static int xilinx_dma_terminate_all(struct dma_chan *dchan)
 	if ((chan->xdev->dma_config->dmatype == XDMA_TYPE_CDMA) && chan->has_sg)
 		dma_ctrl_clr(chan, XILINX_DMA_REG_DMACR,
 			     XILINX_CDMA_CR_SGMODE);
+
+	/* Enable interrupts */
+	dma_ctrl_set(chan, XILINX_DMA_REG_DMACR,
+		      XILINX_DMA_DMAXR_ALL_IRQ_MASK);
+
+	dev_info(chan->dev, "ddomax: xilinx_dma_terminate_all : after enable all IRQ: cr %x, sr %x\n",
+		dma_ctrl_read(chan, XILINX_DMA_REG_DMACR),
+		dma_ctrl_read(chan, XILINX_DMA_REG_DMASR));
+
+	dev_info(chan->dev, "ddomax: xilinx_dma_terminate_all : DMA Channel CR Register is written to enable all IRQ (done)\n");
 
 	return 0;
 }
