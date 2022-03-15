@@ -1689,6 +1689,10 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
 	int err;
 	u32 tmp;
 
+	/* chan->ctrl_offset equals to XILINX_DMA_MM2S_CTRL_OFFSET or XILINX_DMA_S2MM_CTRL_OFFSET, while chan->xdev->regs is the base address of the dma-ip core*/
+	dev_info(chan->dev, "ddomax: xilinx_dma_reset : DMA Channel CR Register ADDR: %x is written to perform a soft reset\n", chan->xdev->regs + chan->ctrl_offset + XILINX_DMA_REG_DMACR);
+	dev_info(chan->dev, "ddomax: xilinx_dma_reset : DMA Channel CR Register is written to perform a soft reset\n");
+
 	dma_ctrl_set(chan, XILINX_DMA_REG_DMACR, XILINX_DMA_DMACR_RESET);
 
 	/* Wait for the hardware to finish reset */
@@ -1722,22 +1726,36 @@ static int xilinx_dma_chan_reset(struct xilinx_dma_chan *chan)
 	int err;
 
 	/* Reset VDMA */
-	err = xilinx_dma_reset(chan);
-	dev_info(chan->dev, "ddomax: DMA Channel CR Register is written to perform a soft reset (1)\n");
-	if (err)
-		return err;
-
-	dev_info(chan->dev, "ddomax: DMA Channel CR Register is written to perform a soft reset (2)\n");
+	/* Reset MM2S channel only as a workaround */
+	/* MM2S channel must be terminated fisrt as a workaround for repeated reset problem in systems that MM2S and S2MM channels sharing the same AXI-DMA IP.*/
+	if (chan->ctrl_offset == XILINX_DMA_MM2S_CTRL_OFFSET)
+	{
+		err = xilinx_dma_reset(chan);
+		if (err)
+			return err;
+	}
 
 	/* Enable interrupts */
 	dma_ctrl_set(chan, XILINX_DMA_REG_DMACR,
 		      XILINX_DMA_DMAXR_ALL_IRQ_MASK);
 
-	dev_info(chan->dev, "ddomax: after enable all IRQ: cr %x, sr %x\n",
-		dma_ctrl_read(chan, XILINX_DMA_REG_DMACR),
-		dma_ctrl_read(chan, XILINX_DMA_REG_DMASR));
+	/* Soft reset is performed across the entire AXI-DMA IP, not only the current channel. 
+	Both interrupts of the MM2S and S2MM channel should be set after a soft reset */
 
-	dev_info(chan->dev, "ddomax: DMA Channel CR Register is written to enable all IRQ (done)\n");
+	// u32 cr_addr;
+	// u32 cr_value;
+
+	// cr_addr = chan->xdev->regs + chan->ctrl_offset + XILINX_DMA_REG_DMACR;
+	// cr_value = ioread32(cr_addr) | XILINX_DMA_DMAXR_ALL_IRQ_MASK;
+	// iowrite32(cr_value, cr_addr);
+
+	// dev_info(chan->dev, "ddomax: xilinx_dma_chan_reset : CR Register ADDR: %x, value: %x is written to enable all IRQ\n", cr_addr, cr_value);
+
+	// cr_addr = chan->xdev->regs + XILINX_DMA_MM2S_CTRL_OFFSET + XILINX_DMA_REG_DMACR;
+	// cr_value = ioread32(cr_addr) | XILINX_DMA_DMAXR_ALL_IRQ_MASK;
+	// iowrite32(cr_value, cr_addr);
+
+	// dev_info(chan->dev, "ddomax: xilinx_dma_chan_reset : CR Register ADDR: %x, value: %x is written to enable all IRQ\n", cr_addr, cr_value);
 
 	return 0;
 }
@@ -2474,12 +2492,6 @@ static int xilinx_dma_terminate_all(struct dma_chan *dchan)
 	/* Enable interrupts */
 	dma_ctrl_set(chan, XILINX_DMA_REG_DMACR,
 		      XILINX_DMA_DMAXR_ALL_IRQ_MASK);
-
-	dev_info(chan->dev, "ddomax: xilinx_dma_terminate_all : after enable all IRQ: cr %x, sr %x\n",
-		dma_ctrl_read(chan, XILINX_DMA_REG_DMACR),
-		dma_ctrl_read(chan, XILINX_DMA_REG_DMASR));
-
-	dev_info(chan->dev, "ddomax: xilinx_dma_terminate_all : DMA Channel CR Register is written to enable all IRQ (done)\n");
 
 	return 0;
 }
