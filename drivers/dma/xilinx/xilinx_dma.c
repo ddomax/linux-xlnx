@@ -2261,7 +2261,7 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
 {
 	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
 	struct xilinx_dma_tx_descriptor *desc;
-	struct xilinx_axidma_tx_segment *segment, *head_segment, *prev = NULL;
+	struct xilinx_axidma_tx_segment *segment, *head_segment, *prev, *next = NULL;
 	size_t copy, sg_used;
 	unsigned int num_periods;
 	int i;
@@ -2340,10 +2340,15 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
 	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
 	/* only 2 segments whose period_len is smaller than hardware limit can use the following setup */
 	if (direction == DMA_MEM_TO_DEV) {
-		head_segment->hw.control |= XILINX_DMA_BD_SOP;
-		head_segment->hw.control |= XILINX_DMA_BD_EOP; //add by ddomax : make tlast and IOC available after transferring a segment
-		segment->hw.control |= XILINX_DMA_BD_EOP;
-		segment->hw.control |= XILINX_DMA_BD_SOP; //add by ddomax : make tlast and IOC available after transferring a segment
+		list_for_each_entry_safe(segment, next,
+					 &desc->segments, node) {
+			segment->hw.control |= XILINX_DMA_BD_EOP;
+			segment->hw.control |= XILINX_DMA_BD_SOP;
+		}
+		// head_segment->hw.control |= XILINX_DMA_BD_SOP;
+		// head_segment->hw.control |= XILINX_DMA_BD_EOP; //add by ddomax : make tlast and IOC available after transferring a segment
+		// segment->hw.control |= XILINX_DMA_BD_EOP;
+		// segment->hw.control |= XILINX_DMA_BD_SOP; //add by ddomax : make tlast and IOC available after transferring a segment
 	}
 
 	return &desc->async_tx;
@@ -2899,7 +2904,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
 		chan->stop_transfer = xilinx_dma_stop_transfer;
 	}
 
-	dev_info(xdev->dev, "ddomax xilinx_dma.c Verison: 2022 03 07 02:42, enable start_transfer in cyclic mode\n");
+	dev_info(xdev->dev, "ddomax xilinx_dma.c Verison: 2022 03 19 22:42, enable start_transfer in cyclic mode\n");
 	dev_info(xdev->dev, "ddomax: reading the sg status register\n");
 	/* check if SG is enabled (only for AXIDMA, AXIMCDMA, and CDMA) */
 	if (xdev->dma_config->dmatype != XDMA_TYPE_VDMA) {
